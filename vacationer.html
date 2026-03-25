@@ -1,0 +1,393 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Approval Tracker — Vacationer Caravans</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:ital,wght@0,300;0,400;0,500;1,300&display=swap" rel="stylesheet" />
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --white:      #ffffff;
+      --off:        #f7f7f5;
+      --border:     #e8e8e4;
+      --muted:      #9a9a92;
+      --text:       #1a1a18;
+      --soft:       #555550;
+      --green:      #2a7a4a;
+      --green-bg:   #edf7f1;
+      --blue:       #1a5fa8;
+      --blue-bg:    #eaf1fb;
+      --amber:      #9a5c00;
+      --amber-bg:   #fdf3e3;
+      --red:        #b03030;
+      --red-bg:     #fdf0f0;
+      --purple:     #6b3fa0;
+      --purple-bg:  #f4eefb;
+      --r:          10px;
+      --r-lg:       16px;
+    }
+
+    body {
+      font-family: 'DM Sans', sans-serif;
+      background: var(--off);
+      color: var(--text);
+      font-size: 15px;
+      line-height: 1.5;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    header {
+      background: var(--white);
+      border-bottom: 1px solid var(--border);
+      padding: 16px 20px;
+      position: sticky;
+      top: 0;
+      z-index: 20;
+    }
+    .hdr {
+      max-width: 820px;
+      margin: 0 auto;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+    .hdr-left { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+    .hdr-title { font-size: 14px; font-weight: 500; letter-spacing: -0.01em; }
+    .hdr-client { font-size: 13px; color: var(--muted); }
+    .hdr-avg {
+      font-family: 'DM Mono', monospace;
+      font-size: 11px;
+      color: var(--muted);
+      background: var(--off);
+      border: 1px solid var(--border);
+      border-radius: 99px;
+      padding: 3px 10px;
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+    .hdr-avg span { color: var(--text); font-weight: 500; }
+
+    main {
+      max-width: 820px;
+      margin: 0 auto;
+      padding: 20px 16px 60px;
+    }
+
+    .metrics {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 8px;
+      margin-bottom: 16px;
+    }
+    @media (min-width: 500px) { .metrics { grid-template-columns: repeat(4, 1fr); } }
+
+    .metric {
+      background: var(--white);
+      border: 1px solid var(--border);
+      border-radius: var(--r-lg);
+      padding: 14px 16px;
+    }
+    .m-label {
+      font-size: 10px;
+      font-family: 'DM Mono', monospace;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 5px;
+    }
+    .m-val {
+      font-size: 28px;
+      font-weight: 300;
+      letter-spacing: -0.04em;
+      line-height: 1;
+      margin-bottom: 3px;
+    }
+    .m-note { font-size: 11px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+    .chart-card {
+      background: var(--white);
+      border: 1px solid var(--border);
+      border-radius: var(--r-lg);
+      padding: 18px 18px 14px;
+      margin-bottom: 16px;
+    }
+    .card-label {
+      font-size: 10px;
+      font-family: 'DM Mono', monospace;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 14px;
+    }
+    .chart-wrap { position: relative; width: 100%; height: 190px; }
+    .legend { display: flex; flex-wrap: wrap; gap: 8px 18px; margin-top: 12px; }
+    .leg { display: flex; align-items: center; gap: 5px; font-size: 11px; color: var(--soft); font-family: 'DM Mono', monospace; }
+    .leg-dot { width: 8px; height: 8px; border-radius: 2px; flex-shrink: 0; }
+
+    .filters { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }
+    .f-btn {
+      font-family: 'DM Sans', sans-serif;
+      font-size: 12px;
+      padding: 5px 13px;
+      border-radius: 99px;
+      border: 1px solid var(--border);
+      background: var(--white);
+      color: var(--soft);
+      cursor: pointer;
+      transition: all 0.12s;
+      line-height: 1;
+    }
+    .f-btn:hover { border-color: #bbb; }
+    .f-btn.on { background: var(--text); color: var(--white); border-color: var(--text); }
+
+    .list { display: flex; flex-direction: column; gap: 5px; }
+
+    .row {
+      background: var(--white);
+      border: 1px solid var(--border);
+      border-radius: var(--r);
+      padding: 11px 14px;
+      display: grid;
+      grid-template-columns: 1fr auto;
+      column-gap: 12px;
+      row-gap: 4px;
+      align-items: center;
+    }
+    .row-name {
+      font-size: 13px;
+      font-weight: 500;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      min-width: 0;
+    }
+    .row-meta {
+      font-size: 10px;
+      font-family: 'DM Mono', monospace;
+      color: var(--muted);
+      grid-column: 1;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .row-right {
+      grid-row: 1 / 3;
+      grid-column: 2;
+      display: flex;
+      flex-direction: column;
+      align-items: flex-end;
+      gap: 6px;
+      flex-shrink: 0;
+    }
+
+    .badge {
+      font-size: 10px;
+      font-weight: 500;
+      font-family: 'DM Mono', monospace;
+      padding: 3px 8px;
+      border-radius: 99px;
+      white-space: nowrap;
+      line-height: 1.4;
+    }
+    .b-fast    { background: var(--green-bg);  color: var(--green); }
+    .b-ok      { background: var(--blue-bg);   color: var(--blue); }
+    .b-slow    { background: var(--amber-bg);  color: var(--amber); }
+    .b-late    { background: var(--red-bg);    color: var(--red); }
+    .b-pending { background: var(--off); color: var(--muted); border: 1px solid var(--border); }
+    .b-manual  { background: var(--purple-bg); color: var(--purple); }
+
+    .bar-track { width: 56px; height: 3px; background: var(--border); border-radius: 2px; overflow: hidden; }
+    .bar-fill  { height: 100%; border-radius: 2px; }
+
+    .empty {
+      text-align: center;
+      padding: 36px;
+      color: var(--muted);
+      font-size: 13px;
+      background: var(--white);
+      border: 1px solid var(--border);
+      border-radius: var(--r);
+    }
+
+    @media (max-width: 380px) {
+      .bar-track { display: none; }
+      .row-meta { font-size: 9px; }
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="hdr">
+    <div class="hdr-left">
+      <span class="hdr-title">Approval Tracker</span>
+      <span class="hdr-client">Vacationer Caravans</span>
+    </div>
+    <div class="hdr-avg">avg <span id="hdr-avg-val">—</span></div>
+  </div>
+</header>
+
+<main>
+  <div class="metrics" id="metrics"></div>
+
+  <div class="chart-card">
+    <div class="card-label">Hours from send → approved</div>
+    <div class="chart-wrap"><canvas id="chart"></canvas></div>
+    <div class="legend">
+      <span class="leg"><span class="leg-dot" style="background:#2a7a4a"></span>Under 12h</span>
+      <span class="leg"><span class="leg-dot" style="background:#1a5fa8"></span>12–24h</span>
+      <span class="leg"><span class="leg-dot" style="background:#c47a00"></span>24–48h</span>
+      <span class="leg"><span class="leg-dot" style="background:#b03030"></span>Over 48h</span>
+    </div>
+  </div>
+
+  <div class="filters" id="filters">
+    <button class="f-btn on" data-f="all">All</button>
+    <button class="f-btn" data-f="fast">Fast (&lt;12h)</button>
+    <button class="f-btn" data-f="ok">12–24h</button>
+    <button class="f-btn" data-f="slow">Slow (&gt;48h)</button>
+    <button class="f-btn" data-f="pending">Pending</button>
+  </div>
+
+  <div class="list" id="list"></div>
+</main>
+
+<script>
+const CARDS = [
+  { name: "Moreton Bay Expo - Social Tile",        status: "approved", hours: 65.3, sendDate: "2026-02-13T06:39:05Z", approveDate: "2026-02-15T23:58:50Z" },
+  { name: "Vacationer: Model Brochures",            status: "approved", hours: 33.5, sendDate: "2026-02-16T04:14:23Z", approveDate: "2026-02-17T13:46:12Z" },
+  { name: "Vacationer Corflute Designs",            status: "approved", hours: null, sendDate: "2026-02-17T00:10:41Z", approveDate: null },
+  { name: "Orange Show - Organic Social Tile",      status: "approved", hours: 15.5, sendDate: "2026-02-24T08:17:30Z", approveDate: "2026-02-24T23:46:33Z" },
+  { name: "Mornington Show - Paid Media Tiles",     status: "approved", hours: 3.4,  sendDate: "2026-02-26T01:21:52Z", approveDate: "2026-02-26T04:45:23Z" },
+  { name: "Mornington Show - Paid Media Video",     status: "approved", hours: 18.9, sendDate: "2026-03-02T06:01:37Z", approveDate: "2026-03-03T00:57:28Z" },
+  { name: "Perth Show - Paid Media Tiles",          status: "approved", hours: 42.1, sendDate: "2026-03-02T06:07:36Z", approveDate: "2026-03-04T00:12:53Z" },
+  { name: "Walkthrough - Endura Video",             status: "approved", hours: 2.5,  sendDate: "2026-03-05T05:39:03Z", approveDate: "2026-03-05T08:07:08Z" },
+  { name: "Border Show - Paid Media Tiles",         status: "approved", hours: 22.9, sendDate: "2026-03-11T00:31:46Z", approveDate: "2026-03-11T23:27:10Z" },
+  { name: "Perth Show - Paid Media Video",          status: "approved", hours: 1.6,  sendDate: "2026-03-11T02:49:31Z", approveDate: "2026-03-11T04:27:54Z" },
+  { name: "Border Show - Paid Media Video",         status: "approved", hours: 1.2,  sendDate: "2026-03-12T01:57:14Z", approveDate: "2026-03-12T03:09:29Z" },
+  { name: "Digital Screens - Border Show",          status: "approved", hours: 16.0, sendDate: "2026-03-12T07:16:57Z", approveDate: "2026-03-12T23:16:20Z" },
+  { name: "Digital Show Guide - Border Show",       status: "approved", hours: 2.5,  sendDate: "2026-03-13T01:55:12Z", approveDate: "2026-03-13T04:26:57Z" },
+  { name: "Walkthrough - Dakar Video",              status: "approved", hours: 0.0,  sendDate: "2026-03-16T04:36:43Z", approveDate: "2026-03-16T04:36:44Z" },
+  { name: "Social Media Tile - Border Show",        status: "approved", hours: 45.5, sendDate: "2026-03-16T04:38:09Z", approveDate: "2026-03-18T02:06:33Z" },
+  { name: "Perth Signage - Vacationer",             status: "approved", hours: null, sendDate: "2026-03-17T02:51:40Z", approveDate: "2026-03-17T02:51:11Z" },
+  { name: "Merchandise Campaign - Social Creative", status: "approved", hours: 18.1, sendDate: "2026-03-19T05:31:55Z", approveDate: "2026-03-19T23:37:48Z" },
+  { name: "Walkthrough - Rough Rider Video",        status: "approved", hours: 4.6,  sendDate: "2026-03-24T00:43:42Z", approveDate: "2026-03-24T05:21:34Z" },
+  { name: "Walkthrough - Endura X Video",           status: "pending",  hours: null, sendDate: "2026-03-25T05:49:18Z", approveDate: null },
+];
+
+function fmtDate(iso) {
+  if (!iso) return null;
+  const d = new Date(iso);
+  return d.toLocaleDateString('en-AU', { day: 'numeric', month: 'short' })
+       + ' ' + d.toLocaleTimeString('en-AU', { hour: 'numeric', minute: '2-digit', hour12: true });
+}
+
+function fmtH(h) {
+  if (h === null || h === undefined) return null;
+  if (h < 0.5)  return '<1h';
+  if (h < 24)   return Math.round(h) + 'h';
+  const d = Math.floor(h / 24), r = Math.round(h % 24);
+  return r ? d + 'd ' + r + 'h' : d + 'd';
+}
+
+function barCol(h) {
+  if (h === null) return '#ccc';
+  if (h < 12)  return '#2a7a4a';
+  if (h < 24)  return '#1a5fa8';
+  if (h < 48)  return '#c47a00';
+  return '#b03030';
+}
+
+function badge(c) {
+  if (c.status === 'pending') return ['b-pending', 'awaiting'];
+  if (c.hours === null)       return ['b-manual',  'manual'];
+  if (c.hours < 0.1)          return ['b-fast',    '<1h'];
+  if (c.hours < 12)           return ['b-fast',    fmtH(c.hours)];
+  if (c.hours < 24)           return ['b-ok',      fmtH(c.hours)];
+  if (c.hours < 48)           return ['b-slow',    fmtH(c.hours)];
+  return                             ['b-late',    fmtH(c.hours)];
+}
+
+const withH   = CARDS.filter(c => c.hours !== null);
+const avg     = withH.reduce((s, c) => s + c.hours, 0) / withH.length;
+const fastest = withH.reduce((m, c) => c.hours < m.hours ? c : m);
+const slowest = withH.reduce((m, c) => c.hours > m.hours ? c : m);
+const pending = CARDS.filter(c => c.status === 'pending');
+
+document.getElementById('hdr-avg-val').textContent = fmtH(Math.round(avg));
+
+document.getElementById('metrics').innerHTML =
+  '<div class="metric"><div class="m-label">Avg approval</div><div class="m-val">' + fmtH(Math.round(avg)) + '</div><div class="m-note">' + withH.length + ' deliverables</div></div>' +
+  '<div class="metric"><div class="m-label">Fastest</div><div class="m-val">' + fmtH(fastest.hours) + '</div><div class="m-note">' + fastest.name.split(' - ')[0].substring(0, 22) + '</div></div>' +
+  '<div class="metric"><div class="m-label">Slowest</div><div class="m-val">' + fmtH(slowest.hours) + '</div><div class="m-note">' + slowest.name.split(' - ')[0].substring(0, 22) + '</div></div>' +
+  '<div class="metric"><div class="m-label">Pending</div><div class="m-val">' + pending.length + '</div><div class="m-note">' + (pending.length === 1 ? pending[0].name.split(' - ')[0].substring(0, 22) : 'awaiting approval') + '</div></div>';
+
+const chartCards = CARDS.filter(c => c.hours !== null);
+const shortName = n => {
+  let s = n.replace('Walkthrough - ','').replace(' - Border Show','').replace('Paid Media ','').replace('Vacationer: ','').replace('Vacationer ','');
+  return s.length > 16 ? s.substring(0, 15) + '…' : s;
+};
+
+new Chart(document.getElementById('chart'), {
+  type: 'bar',
+  data: {
+    labels: chartCards.map(c => shortName(c.name)),
+    datasets: [{ data: chartCards.map(c => Math.max(c.hours, 0.15)), backgroundColor: chartCards.map(c => barCol(c.hours)), borderRadius: 3 }]
+  },
+  options: {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+      legend: { display: false },
+      tooltip: { callbacks: {
+        title: ctx => chartCards[ctx[0].dataIndex].name,
+        label: ctx => ' ' + fmtH(chartCards[ctx[0].dataIndex].hours) + ' to approve'
+      }}
+    },
+    scales: {
+      x: { ticks: { font: { size: 9, family: 'DM Mono' }, color: '#aaa', maxRotation: 45, autoSkip: false }, grid: { display: false }, border: { color: '#e8e8e4' } },
+      y: { ticks: { font: { size: 9, family: 'DM Mono' }, color: '#aaa', callback: v => v + 'h' }, grid: { color: '#f0f0ec' }, border: { display: false } }
+    }
+  }
+});
+
+const MAX_H = Math.max(...CARDS.map(c => c.hours || 0));
+
+function renderList(filter) {
+  let items = CARDS;
+  if (filter === 'fast')    items = CARDS.filter(c => c.hours !== null && c.hours < 12);
+  if (filter === 'ok')      items = CARDS.filter(c => c.hours !== null && c.hours >= 12 && c.hours < 24);
+  if (filter === 'slow')    items = CARDS.filter(c => c.hours !== null && c.hours > 48);
+  if (filter === 'pending') items = CARDS.filter(c => c.status === 'pending');
+
+  const list = document.getElementById('list');
+  if (!items.length) { list.innerHTML = '<div class="empty">No cards match this filter.</div>'; return; }
+
+  list.innerHTML = items.map(c => {
+    const [cls, lbl] = badge(c);
+    const pct  = c.hours ? Math.min(100, (c.hours / MAX_H) * 100).toFixed(1) : 0;
+    const sent = fmtDate(c.sendDate);
+    const appr = fmtDate(c.approveDate);
+    const meta = appr ? 'sent ' + sent + ' &nbsp;→&nbsp; approved ' + appr : 'sent ' + sent;
+    return '<div class="row"><div class="row-name" title="' + c.name + '">' + c.name + '</div><div class="row-right"><span class="badge ' + cls + '">' + lbl + '</span><div class="bar-track"><div class="bar-fill" style="width:' + pct + '%;background:' + barCol(c.hours) + '"></div></div></div><div class="row-meta">' + meta + '</div></div>';
+  }).join('');
+}
+
+renderList('all');
+
+document.getElementById('filters').addEventListener('click', e => {
+  const btn = e.target.closest('.f-btn');
+  if (!btn) return;
+  document.querySelectorAll('.f-btn').forEach(b => b.classList.remove('on'));
+  btn.classList.add('on');
+  renderList(btn.dataset.f);
+});
+</script>
+</body>
+</html>
